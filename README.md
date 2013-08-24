@@ -8,7 +8,16 @@ The main switching boils down to a single memcpy() in src/ring.c:233.
 
 Supports TP_STATUS_CSUMNOTREAD for checksum offloading on virtual interfaces.
 
+Author
+----
+Benjamin Kittridge
 
+bysin@bysin.net
+
+http://byteworm.com
+
+Usage
+----
 
     Usage: ubridge [OPTIONS]...
       --debug     Run in foreground and print packets
