@@ -40,10 +40,12 @@
 
 ////////////////////////////////////////////////////////////////////////////////
 // Section:     Ring setup
+// Description: Creates a new packet ring based upon interface device
 
 q_ring_t q_ring_new(char *device) {
 	q_ring_t n;
 
+	// Create object that holds device information
 	n = calloc(sizeof(*n), 1);
 	q_ring_bind(n, device);
 	q_ring_setup(n, n->rx, PACKET_RX_RING);
@@ -57,8 +59,11 @@ void q_ring_setup(q_ring_t n, q_ring_group_t g, uint32_t direct) {
 	q_ring_data_t ring;
 	int32_t val, hdr_size, i;
 	
+	// Frame size must be atleast the size of the MTU, if it was smaller
+	// no packets could be retreived/sent
 	static_assert(Q_RING_FRAME_SIZE > Q_RING_MTU);
 	
+	// Open raw socket and set TPACKET option
 	if ((g->fd = socket(AF_PACKET, SOCK_RAW, 0)) < 0)
 		error("socket: %s", strerror(errno));
 
@@ -66,6 +71,8 @@ void q_ring_setup(q_ring_t n, q_ring_group_t g, uint32_t direct) {
 	if (setsockopt(g->fd, SOL_PACKET, PACKET_VERSION, &val, sizeof(val)) < 0)
 		error("setsockopt: %s", strerror(errno));
 
+	// Initialize ring with frame size as the MTU, the number of blocks per frame
+	// should be large enough to prevent dropped packets in circular buffer
 	g->req.tp_frame_size = Q_RING_FRAME_SIZE;
 	g->req.tp_block_size = Q_RING_FRAME_SIZE * Q_RING_FRAME_PER_BLOCK;
 	g->req.tp_block_nr = Q_RING_BLOCK_COUNT;
@@ -73,11 +80,14 @@ void q_ring_setup(q_ring_t n, q_ring_group_t g, uint32_t direct) {
 	if ((setsockopt(g->fd, SOL_PACKET, direct, (char*)&g->req, sizeof(g->req))) < 0)
 		error("setsockopt(%d): %s", direct, strerror(errno));
 
+	// Create mmap()'d memory for kernel to read/write directly
 	g->map_len = g->req.tp_block_size * g->req.tp_block_nr;
 	g->map = mmap(NULL, g->map_len, PROT_READ | PROT_WRITE, MAP_SHARED, g->fd, 0);
 	if (g->map == MAP_FAILED)
 		error("mmap: %s", strerror(errno));
 	
+	// Initialize a pointer to each frame in the ring, the frame must
+	// be TPACKET_ALIGN'd
 	ring = calloc(g->req.tp_frame_nr * sizeof(*ring), 1);
 	hdr_size = TPACKET_ALIGN(sizeof(*ring[0].hdr));
 	for (i = 0; i < g->req.tp_frame_nr; i++) {
@@ -88,10 +98,12 @@ void q_ring_setup(q_ring_t n, q_ring_group_t g, uint32_t direct) {
 		ring[i].len = g->req.tp_frame_size - hdr_size;
 	}
 
+	// Sets the start and end of the circular buffer
 	g->r_start = &ring[0];
 	g->r_end = &ring[g->req.tp_frame_nr];
 	g->r = g->r_start;
 
+	// Tell kernel to listen for all ethernet packets
 	memset(&addr, 0, sizeof(addr));
 	addr.sll_family = AF_PACKET;
 	addr.sll_protocol = htons(ETH_P_ALL);
@@ -99,6 +111,8 @@ void q_ring_setup(q_ring_t n, q_ring_group_t g, uint32_t direct) {
 	if (bind(g->fd, (struct sockaddr *)&addr, sizeof(addr)) < 0)
 		error("bind: %s", strerror(errno));
 
+	// Turn on promiscuous mode to read packets with any destination address,
+	// including packets not destined to host
 	memset(&mr, 0, sizeof (mr));
 	mr.mr_ifindex = n->ifindex;
 	mr.mr_type = PACKET_MR_PROMISC;
@@ -111,6 +125,7 @@ void q_ring_bind(q_ring_t n, char *device) {
 	struct ethtool_value eval;
 	int32_t fd;
 	
+	// Find interface index and MTU sing device name
 	if ((fd = socket(PF_INET, SOCK_DGRAM, IPPROTO_IP)) < 0)
 		error("socket: %s", strerror(errno));
 	
@@ -125,10 +140,13 @@ void q_ring_bind(q_ring_t n, char *device) {
 		error("ioctl: %s", strerror(errno));
 	n->mtu = s_ifr.ifr_mtu;
 	
+	// The MTU of the device must be ETH_DATA_LEN, could allow a variable sized
+	// MTU, but it complicates the code a bit
 	if (n->mtu != Q_RING_MTU)
 		error("Device %s has an is incorrect MTU (%u, should be %u)",
 			device, n->mtu, Q_RING_MTU);
 	
+	// Loopback devices are not allowed, make sure promisc mode is enabled
 	if (ioctl(fd, SIOCGIFFLAGS, &s_ifr) < 0)
 		error("ioctl: %s", strerror(errno));
 	if ((s_ifr.ifr_flags & IFF_LOOPBACK))
@@ -141,6 +159,9 @@ void q_ring_bind(q_ring_t n, char *device) {
 			error("ioctl: %s", strerror(errno));
 	}
 	
+	// Large/Generic Receive Offloading and TCP Segmentation Offloading will not work
+	// with this bridge and must be disabled. This hopefully wont cause unexpected side
+	// effects with unsuspecting users
 	s_ifr.ifr_data = (void*)&eval;
 	
 	eval.cmd = ETHTOOL_GFLAGS;
@@ -189,15 +210,21 @@ q_ring_data_t q_ring_read(q_ring_t n) {
 	q_ring_group_t g;
 	q_ring_data_t r;
 	
+	// Use RX ring to read data, check if new data is available
 	g = n->rx;
 	r = g->r;
 	if (!r->hdr->tp_status)
 		return NULL;
 		
+	// Memory barrier
 	__sync_synchronize();
 
+	// Increment circular buffer while wrapping around
+	// to the end of the list
 	if (++g->r == g->r_end)
 		g->r = g->r_start;
+
+	// Returns the last received ring data
 	return r;
 }
 
@@ -209,8 +236,11 @@ void q_ring_write(q_ring_t n, uint8_t *buf, uint32_t len) {
 	q_ring_group_t g;
 	q_ring_data_t r;
 	
+	// Use TX ring to write data
 	g = n->tx;
 	r = g->r;
+
+	// Wait until current data has been accepted by kernel
 	while (r->hdr->tp_status != TP_STATUS_AVAILABLE) {
 		switch (r->hdr->tp_status) {
 			case TP_STATUS_AVAILABLE:
@@ -228,16 +258,22 @@ void q_ring_write(q_ring_t n, uint8_t *buf, uint32_t len) {
 		}
 	}
 	
+	// This shouldn't happen, but check anyway
 	if (len > r->len)
 		error("Packet too large for transmission");
+
+	// Copy data from buffer into ring
 	memcpy(r->buf, buf, len);
 	r->hdr->tp_len = len;
 	r->hdr->tp_status = TP_STATUS_SEND_REQUEST;
 		
 	n->pending_write++;
 	
+	// Memory barrier
 	__sync_synchronize();
 	
+	// Increment circular buffer while wrapping around
+	// to the end of the list
 	if (++g->r == g->r_end)
 		g->r = g->r_start;
 }
@@ -245,6 +281,7 @@ void q_ring_write(q_ring_t n, uint8_t *buf, uint32_t len) {
 void q_ring_yield(q_ring_t n) {
 	struct pollfd pfd[1];
 	
+	// Wait for status change on ring n
 	pfd[0].fd = n->rx->fd;
 	pfd[0].events = POLLIN;
 	
@@ -254,6 +291,7 @@ void q_ring_yield(q_ring_t n) {
 void q_ring_yield_dbl(q_ring_t n1, q_ring_t n2) {
 	struct pollfd pfd[2];
 	
+	// Wait for status change on ring n or n2
 	pfd[0].fd = n1->rx->fd;
 	pfd[0].events = POLLIN;
 	
@@ -264,19 +302,26 @@ void q_ring_yield_dbl(q_ring_t n1, q_ring_t n2) {
 }
 
 void q_ring_flush(q_ring_t n, bool block) {
+	// Wait for kernel to flush data in TX ring, pending_write should be set to the
+	// number of pending frames
 	if (!block && !n->pending_write)
 		return;
+
+	// If block is set, will return only when TX ring has been completely flushed
 	if (sendto(n->tx->fd, NULL, 0, (block ? 0 : MSG_DONTWAIT), NULL, 0) < 0) {
 		if (errno == ENOBUFS)
 			warning("send: %s", strerror(errno));
 		else
 			error("send: %s", strerror(errno));
 	}
+
+	// Reset pending frame write count
 	n->pending_write = 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Section:     Ring data
+// Description: If debugging is enabled, parse and print packet
 
 void q_ring_data_debug(q_ring_data_t r) {
 #ifdef Q_RING_LONG_PARSE
@@ -295,6 +340,7 @@ void q_ring_data_debug(q_ring_data_t r) {
 
 ////////////////////////////////////////////////////////////////////////////////
 // Section:     Ring destruction
+// Description: Close fd and free memory
 
 void q_ring_free(q_ring_t n) {
 	close(n->rx->fd);

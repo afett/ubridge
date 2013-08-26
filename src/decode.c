@@ -43,11 +43,15 @@ static int (*q_decode_func)(uint8_t *buf, uint32_t len);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Section:     Decode
+// Description: Parses and prints a packet
 
 void q_decode_parse(uint8_t *buf, uint32_t len) {
 	int ret;
 
+	// Main decode loop, q_decode_func points to the current
+	// decoding function to be called next
 	q_decode_func = q_decode_pkt;
+
 	while (len >= 0) {
 		if (!q_decode_func)
 			break;
@@ -64,9 +68,11 @@ int q_decode_pkt(uint8_t *buf, uint32_t len) {
 	struct timezone tvp;
 	struct tm tm;
 
+	// Get local time
 	gettimeofday(&tv, &tvp);
 	localtime_r(&tv.tv_sec, &tm);
 
+	// Pretty print local time
 #ifdef Q_DECODE_CONF_SHORT
 	printf("%02d:%02d:%02d.%06"PRIu64" ",
 		tm.tm_hour, tm.tm_min, tm.tm_sec, (uint64_t)tv.tv_usec);
@@ -75,6 +81,7 @@ int q_decode_pkt(uint8_t *buf, uint32_t len) {
 		len, tm.tm_hour, tm.tm_min, tm.tm_sec, (uint64_t)tv.tv_usec);
 #endif
 
+	// Next header is the ethernet header
 	q_decode_func = q_decode_eth;
 	return 0;
 }
@@ -82,7 +89,8 @@ int q_decode_pkt(uint8_t *buf, uint32_t len) {
 int q_decode_eth(uint8_t *buf, uint32_t len) {
 	struct ethhdr *eth;
 
-	eth = (struct ethhdr*)buf;
+	// Decode and print ethernet header
+	eth = (struct ethhdr*) buf;
 	if (len < sizeof(*eth)) {
 		q_decode_func = q_decode_data;
 		return 0;
@@ -98,6 +106,8 @@ int q_decode_eth(uint8_t *buf, uint32_t len) {
 		htons(eth->h_proto));
 #endif
 
+	// Using the protocol specified in ethernet header, find next
+	// decoding function
 	switch (htons(eth->h_proto)) {
 		case ETH_P_IPV6:
 			q_decode_func = q_decode_ipv6;
@@ -122,12 +132,14 @@ int q_decode_arp(uint8_t *buf, uint32_t len) {
 	struct arphdr *arp;
 	char *op;
 
-	arp = (struct arphdr*)buf;
+	// Decode and print arp header
+	arp = (struct arphdr*) buf;
 	if (len < sizeof(*arp)) {
 		q_decode_func = q_decode_data;
 		return 0;
 	}
 
+	// List of common ARP operations
 	switch (htons(arp->ar_op)) {
 		case ARPOP_REQUEST:	op = "REQUEST";   break;
 		case ARPOP_REPLY:	op = "REPLY";     break;
@@ -151,6 +163,7 @@ int q_decode_arp(uint8_t *buf, uint32_t len) {
 		op, htons(arp->ar_op));
 #endif
 
+	// Currently only supports ethernet MAC and IP arp parsing
 	if (htons(arp->ar_hrd) == ARPHRD_ETHER && arp->ar_hln == ETH_ALEN &&
 	    htons(arp->ar_pro) == ETH_P_IP && arp->ar_pln == sizeof(in_addr_t))
 		q_decode_func = q_decode_arp_eth_ip;
@@ -162,7 +175,8 @@ int q_decode_arp(uint8_t *buf, uint32_t len) {
 int q_decode_arp_eth_ip(uint8_t *buf, uint32_t len) {
 	struct arpeihdr *arpei;
 
-	arpei = (struct arpeihdr*)buf;
+	// Decode and print ethernet MAC and IP part of ARP operation
+	arpei = (struct arpeihdr*) buf;
 	if (len < sizeof(*arpei)) {
 		q_decode_func = q_decode_data;
 		return 0;
@@ -198,6 +212,7 @@ int q_decode_arp_eth_ip(uint8_t *buf, uint32_t len) {
 }
 
 void q_decode_ip_proto(uint32_t proto) {
+	// Finds the next decode function based upon IP proto
 	switch (proto) {
 		case IPPROTO_ICMP:
 			q_decode_func = q_decode_icmp;
@@ -224,7 +239,8 @@ void q_decode_ip_proto(uint32_t proto) {
 int q_decode_ipv4(uint8_t *buf, uint32_t len) {
 	struct ip *ip;
 
-	ip = (struct ip*)buf;
+	// Decode and print iP header
+	ip = (struct ip*) buf;
 	if (len < sizeof(*ip)) {
 		q_decode_func = q_decode_data;
 		return 0;
@@ -250,6 +266,7 @@ int q_decode_ipv4(uint8_t *buf, uint32_t len) {
 		((uint8_t*)&ip->ip_dst)[2], ((uint8_t*)&ip->ip_dst)[3]);
 #endif
 
+	// Find next decode function
 	q_decode_ip_proto(ip->ip_p);
 	return sizeof(*ip);
 }
@@ -257,7 +274,8 @@ int q_decode_ipv4(uint8_t *buf, uint32_t len) {
 int q_decode_ipv6(uint8_t *buf, uint32_t len) {
 	struct ip6_hdr *ip6;
 
-	ip6 = (struct ip6_hdr*)buf;
+	// Decode and print IPv6 header
+	ip6 = (struct ip6_hdr*) buf;
 	if (len < sizeof(*ip6)) {
 		q_decode_func = q_decode_data;
 		return 0;
@@ -306,6 +324,7 @@ int q_decode_ipv6(uint8_t *buf, uint32_t len) {
 		htons(((uint16_t*)&ip6->ip6_dst)[7]));
 #endif
 
+	// Using the same IP protocol parser as IPv4
 	q_decode_ip_proto(ip6->ip6_nxt);
 	return sizeof(*ip6);
 }
@@ -313,7 +332,8 @@ int q_decode_ipv6(uint8_t *buf, uint32_t len) {
 int q_decode_icmp(uint8_t *buf, uint32_t len) {
 	struct icmp *icmp;
 
-	icmp = (struct icmp*)buf;
+	// Decode and print ICMP header
+	icmp = (struct icmp*) buf;
 	if (len < sizeof(*icmp)) {
 		q_decode_func = q_decode_data;
 		return 0;
@@ -338,7 +358,8 @@ int q_decode_tcp(uint8_t *buf, uint32_t len) {
 	struct tcphdr *tcp;
 	uint32_t tcpopt_len;
 
-	tcp = (struct tcphdr*)buf;
+	// Decode and print TCP header
+	tcp = (struct tcphdr*) buf;
 	if (len < sizeof(*tcp)) {
 		q_decode_func = q_decode_data;
 		return 0;
@@ -358,6 +379,7 @@ int q_decode_tcp(uint8_t *buf, uint32_t len) {
 		tcp->th_off);
 #endif
 
+	// Print each tcp flag as a string
 	if ((tcp->th_flags & TH_FIN))
 		printf("FIN ");
 	if ((tcp->th_flags & TH_SYN))
@@ -378,6 +400,7 @@ int q_decode_tcp(uint8_t *buf, uint32_t len) {
 		       htons(tcp->th_sum),
 		       htons(tcp->th_urp));
 
+	// Print each tcp option (or atleast the ones that are supported)
 	tcpopt_len = (tcp->th_off * 4) - sizeof(*tcp);
 	if (tcpopt_len) {
 		uint32_t i, haslen;
@@ -425,6 +448,7 @@ int q_decode_tcp(uint8_t *buf, uint32_t len) {
 					break;
 			}
 			
+			// Some options contain a length, other's are single sized options
 			if (haslen && tcpopt[i+1] > 0)
 				i += tcpopt[i+1];
 			else
@@ -441,7 +465,8 @@ int q_decode_tcp(uint8_t *buf, uint32_t len) {
 int q_decode_udp(uint8_t *buf, uint32_t len) {
 	struct udphdr *udp;
 
-	udp = (struct udphdr*)buf;
+	// Decode and parse UDP header
+	udp = (struct udphdr*) buf;
 	if (len < sizeof(*udp)) {
 		q_decode_func = q_decode_data;
 		return 0;
@@ -470,6 +495,7 @@ int q_decode_data(uint8_t *buf, uint32_t len) {
 	uint8_t *str, *ptr;
 	int32_t n;
 
+	// Print the remaining packet as printable ASCII string
 	str = malloc((len * 4) + 1);
 	for (ptr = str, n = 0; n < len; n++) {
 		if (isprint(buf[n])) {
@@ -527,6 +553,7 @@ int q_decode_data(uint8_t *buf, uint32_t len) {
 	uint8_t *str, *ptr;
 	int32_t n;
 
+	// Print the remaining packet as a series of 2 digit hex
 	str = malloc((len * 3) + 1);
 	for (ptr = str, n = 0; n < len; n++)
 		ptr += sprintf((char*)ptr, "%02x ", buf[n]);
@@ -537,6 +564,7 @@ int q_decode_data(uint8_t *buf, uint32_t len) {
 #endif
 #endif
 
+	// Force the main decode loop to exit, we are done with the packet
 	q_decode_func = NULL;
 	return 0;
 }

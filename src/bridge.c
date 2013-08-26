@@ -35,67 +35,90 @@ static bool q_bridge_debug = false;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Section:     Start bridge
+// Description: The bridge loop reads from each ring and writes to it's
+//              counterpart
 
 void q_bridge_start(char *src, char *dst, bool debug) {
 	q_ring_t n, k;
 	q_ring_data_t r;
 	
 	q_bridge_debug = debug;
-	
+
+	// Create a ring for each interface	
 	n = q_ring_new(src);
 	k = q_ring_new(dst);
 	
 	while (1) {
+		// Read from source interface and dispatch results (q_ring_data_t)
+		// to destination interface
 		while ((r = q_ring_read(n))) {
 			q_bridge_dispatch(k, r);
 			q_ring_ready(r);
 		}
+
+		// Reads from destination interface to source interface
 		while ((r = q_ring_read(k))) {
 			q_bridge_dispatch(n, r);
 			q_ring_ready(r);
 		}
 		
+		// Flushes each ring if data was dispatched to it
 		q_ring_flush(n, false);
 		q_ring_flush(k, false);
 		
+		// Yield until data is available on either interface
 		q_ring_yield_dbl(n, k);
 	}
-	
+
+	// Cannot be reached, but clean-up just in case
 	q_ring_free(n);
 	q_ring_free(k);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Section:     Dispatch packet
+// Description: Writes packet to target ring
 
 void q_bridge_dispatch(q_ring_t n, q_ring_data_t r) {
 	uint8_t *buf;
 	uint32_t len;
 	
+	// Determine if packet type matches a packet that we should
+	// relay to target ring
 	if (r->sll->sll_pkttype != PACKET_HOST &&
 	    r->sll->sll_pkttype != PACKET_MULTICAST &&
 	    r->sll->sll_pkttype != PACKET_BROADCAST &&
 	    r->sll->sll_pkttype != PACKET_OTHERHOST)
 		return;
-	
+
+	// Print packet if debugging is enabled
 	if (q_bridge_debug)
 		q_ring_data_debug(r);
 
+	// Point the buffer to the correct location
 	buf = r->blk + r->hdr->tp_mac;
 	len = r->hdr->tp_len;
-	
+
+	// At this point, tp_snaplen = tp_len and tp_snaplen should fit on a
+	// single frame, does not support fragmentation
 	if (len != r->hdr->tp_snaplen || len > Q_RING_MAX_FRAME)
 		error("Packet too large (len = %u / %u)", len, r->hdr->tp_snaplen);
 
+	// If checksum is not ready (usually happens when receiving a packet
+	// from a virtual interface, calculate ip checksum
 	if ((r->hdr->tp_status & TP_STATUS_CSUMNOTREADY))
 		q_bridge_checksum(buf, len);
-		
+
+	// Write packet to target ring
 	q_ring_write(n, buf, len);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Section:     Checksuming
+// Description: Must checksum packets where status contains TP_STATUS_CSUMNOTREADY
 
+// Macro that sets the header to the front of the buffer while incrementing
+// the pointer to the the length of the header
 #define POP_HEADER(_var, _buf, _len) ({			\
 		_var = (void *)_buf;			\
 		(_len >= sizeof(*_var) ? 		\
@@ -111,16 +134,22 @@ void q_bridge_checksum(uint8_t *buf, uint32_t len) {
 	struct udphdr *udp;
 	struct icmphdr *icmp;
 
+	// Pop ethernet header and increment buffer
 	if (!POP_HEADER(eth, buf, len))
 		return;
+
+	// Checksum routine only supports IP packets
 	if (htons(eth->h_proto) != ETH_P_IP)
 		return;
 
+	// Pop IP header
 	if (!POP_HEADER(ip, buf, len))
 		return;
+	// Calculate IP checksum using one's complement
 	ip->check = 0;
 	ip->check = q_bridge_checksum_ip((uint16_t*)ip, sizeof(*ip));
 	
+	// Calculate checksum for various IP protocols
 	switch (ip->protocol) {
 		case IPPROTO_TCP:
 			if (!POP_HEADER(tcp, buf, len))
@@ -153,6 +182,7 @@ uint16_t q_bridge_checksum_ip(uint16_t *buf, uint32_t len) {
 	uint16_t *w;
 	uint32_t nleft;
 	
+	// One's complement checksum routine
 	sum = 0;
 	nleft = len;
 	w = buf;
@@ -176,6 +206,8 @@ uint16_t q_bridge_checksum_ip_proto(uint16_t *buf, uint16_t len, uint16_t proto,
 	uint32_t sum;
 	uint16_t length;
 	
+	// Checksum is usually derived from pseudo-header of IP protocol, but
+	// a better way would be to simply include the header in place
 	sum = 0;
 	length = len;
 	ip_src = (uint16_t*)&src_addr;

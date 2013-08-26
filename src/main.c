@@ -23,6 +23,7 @@
 
 ////////////////////////////////////////////////////////////////////////////////
 // Section:     Options
+// Description: Parses getopt() options
 
 enum {
 	OPTION_DEBUG,
@@ -45,6 +46,7 @@ static struct option option_fields[] = {
 
 ////////////////////////////////////////////////////////////////////////////////
 // Section:     Static information
+// Description: Prints help and version information when requested
 
 void help() {
 	printf("\n");
@@ -68,6 +70,7 @@ void version() {
 
 ////////////////////////////////////////////////////////////////////////////////
 // Section:     Initialization
+// Description: Parse command line and start the bridge
 
 int main(int argc, char **argv) {
 	int32_t c;
@@ -82,6 +85,7 @@ int main(int argc, char **argv) {
 		if ((c = getopt_long_only(argc, argv, "", option_fields, NULL)) < 0)
 			break;
 		
+		// Process each option returned
 		switch (c) {
 			case OPTION_DEBUG:
 				debug = true;
@@ -110,6 +114,7 @@ int main(int argc, char **argv) {
 		}
 	}
 	
+	// The user entered non-option data
 	if (optind != argc) {
 		warning("Unknown or invalid option at \"%s\"", argv[optind]);
 		help();
@@ -128,11 +133,13 @@ int main(int argc, char **argv) {
 		return 0;
 	}
 
+	// If debugging is turned off, fork process into the background and close fd's
 	if (!debug) {
 		if (daemon(1, 0) < 0)
 			error("Error forking process");
 	}
 	
+	// Main bridge loop
 	q_bridge_start(src, dst, debug);
 	return 0;
 }
