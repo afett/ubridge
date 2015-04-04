@@ -24,4 +24,3 @@
 
 #define static_assert(c)			\
 	switch (0) { case 0: case (c): ; }
-

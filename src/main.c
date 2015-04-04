@@ -38,7 +38,7 @@ static struct option option_fields[] = {
 	{ "debug",		0,	0,	OPTION_DEBUG			},
 	{ "src",		1,	0,	OPTION_SRC			},
 	{ "dst",		1,	0,	OPTION_DST			},
-	
+
 	{ "help",		0,	0,	OPTION_HELP			},
 	{ "version",		0,	0,	OPTION_VERSION			},
 	{ NULL,			0,	0,	0				}
@@ -80,40 +80,40 @@ int main(int argc, char **argv) {
 	src = NULL;
 	dst = NULL;
 	debug = false;
-	
+
 	while (1) {
 		if ((c = getopt_long_only(argc, argv, "", option_fields, NULL)) < 0)
 			break;
-		
+
 		// Process each option returned
 		switch (c) {
 			case OPTION_DEBUG:
 				debug = true;
 				break;
-				
+
 			case OPTION_SRC:
 				src = optarg;
 				break;
-				
+
 			case OPTION_DST:
 				dst = optarg;
 				break;
-				
+
 			case OPTION_HELP:
 				help();
 				break;
-				
+
 			case OPTION_VERSION:
 				version();
 				break;
-				
+
 			default:
 				warning("Unknown or invalid option at \"%s\" (%d)", argv[optind], c);
 				help();
 				break;
 		}
 	}
-	
+
 	// The user entered non-option data
 	if (optind != argc) {
 		warning("Unknown or invalid option at \"%s\"", argv[optind]);
@@ -138,7 +138,7 @@ int main(int argc, char **argv) {
 		if (daemon(1, 0) < 0)
 			error("Error forking process");
 	}
-	
+
 	// Main bridge loop
 	q_bridge_start(src, dst, debug);
 	return 0;

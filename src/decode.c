@@ -113,15 +113,15 @@ int q_decode_eth(uint8_t *buf, uint32_t len) {
 		case ETH_P_IPV6:
 			q_decode_func = q_decode_ipv6;
 			break;
-			
+
 		case ETH_P_ARP:
 			q_decode_func = q_decode_arp;
 			break;
-			
+
 		case ETH_P_IP:
 			q_decode_func = q_decode_ipv4;
 			break;
-			
+
 		default:
 			q_decode_func = q_decode_data;
 			break;
@@ -151,7 +151,7 @@ int q_decode_arp(uint8_t *buf, uint32_t len) {
 		case ARPOP_NAK:		op = "NAK";       break;
 		default:		op = "UNKNOWN";   break;
 	}
-	
+
 #ifdef Q_DECODE_CONF_SHORT
 	printf("ARP %d,%d > %d,%d > %s(%d) ",
 		htons(arp->ar_hrd), arp->ar_hln,
@@ -199,7 +199,7 @@ int q_decode_arp_eth_ip(uint8_t *buf, uint32_t len) {
 		"src_ip=%d.%d.%d.%d dst_mac=%02x:%02x:%02x:%02x:%02x:%02x "
 		"dst_ip=%d.%d.%d.%d ]\n",
 		arpei->src_mac[0], arpei->src_mac[1], arpei->src_mac[2],
-		arpei->src_mac[3], arpei->src_mac[4], arpei->src_mac[5], 
+		arpei->src_mac[3], arpei->src_mac[4], arpei->src_mac[5],
 		((uint8_t*)&arpei->src_ip)[0], ((uint8_t*)&arpei->src_ip)[1],
 		((uint8_t*)&arpei->src_ip)[2], ((uint8_t*)&arpei->src_ip)[3],
 		arpei->dst_mac[0], arpei->dst_mac[1], arpei->dst_mac[2],
@@ -207,7 +207,7 @@ int q_decode_arp_eth_ip(uint8_t *buf, uint32_t len) {
 		((uint8_t*)&arpei->dst_ip)[0], ((uint8_t*)&arpei->dst_ip)[1],
 		((uint8_t*)&arpei->dst_ip)[2], ((uint8_t*)&arpei->dst_ip)[3]);
 #endif
-	
+
 	q_decode_func = q_decode_data;
 	return sizeof(*arpei);
 }
@@ -218,19 +218,19 @@ void q_decode_ip_proto(uint32_t proto) {
 		case IPPROTO_ICMP:
 			q_decode_func = q_decode_icmp;
 			break;
-			
+
 		case IPPROTO_TCP:
 			q_decode_func = q_decode_tcp;
 			break;
-			
+
 		case IPPROTO_UDP:
 			q_decode_func = q_decode_udp;
 			break;
-			
+
 		case IPPROTO_IPV6:
 			q_decode_func = q_decode_ipv6;
 			break;
-			
+
 		default:
 			q_decode_func = q_decode_data;
 			break;
@@ -416,31 +416,31 @@ int q_decode_tcp(uint8_t *buf, uint32_t len) {
 				case TCPOPT_EOL:
 					printf("EOL ");
 					break;
-					
+
 				case TCPOPT_NOP:
 					printf("NOP ");
 					break;
-					
+
 				case TCPOPT_MAXSEG:
 					printf("MAXSEG:%u ",
 						htons(*(uint16_t*)(tcpopt + i + 2)));
 					haslen = 1;
 					break;
-					
+
 				case TCPOPT_WINDOW:
 					printf("WINDOW:%u ", tcpopt[i+2]);
 					haslen = 1;
 					break;
-					
+
 				case TCPOPT_SACK_PERMITTED:
 					printf("SACK_PERMIT ");
 					haslen = 1;
 					break;
-					
+
 				case TCPOPT_SACK:
 					printf("SACK ");
 					break;
-					
+
 				case TCPOPT_TIMESTAMP:
 					printf("TIMESTAMP:%u:%u ",
 						htonl(*(uint32_t*)(tcpopt + i + 2)),
@@ -448,7 +448,7 @@ int q_decode_tcp(uint8_t *buf, uint32_t len) {
 					haslen = 1;
 					break;
 			}
-			
+
 			// Some options contain a length, other's are single sized options
 			if (haslen && tcpopt[i+1] > 0)
 				i += tcpopt[i+1];
@@ -505,12 +505,12 @@ int q_decode_data(uint8_t *buf, uint32_t len) {
 					*ptr++ = '\\';
 					*ptr++ = '\\';
 					break;
-					
+
 				case '"':
 					*ptr++ = '\\';
 					*ptr++ = '"';
 					break;
-					
+
 				default:
 					*ptr++ = buf[n];
 					break;
@@ -522,23 +522,23 @@ int q_decode_data(uint8_t *buf, uint32_t len) {
 				case '\n':
 					*ptr++ = 'n';
 					break;
-					
+
 				case '\r':
 					*ptr++ = 'r';
 					break;
-					
+
 				case '\b':
 					*ptr++ = 'b';
 					break;
-					
+
 				case '\a':
 					*ptr++ = 'a';
 					break;
-					
+
 				case '\t':
 					*ptr++ = 't';
 					break;
-					
+
 				default:
 					*ptr++ = 'x';
 					ptr += sprintf((char*)ptr, "%02x", buf[n]);

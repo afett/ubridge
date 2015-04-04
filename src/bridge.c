@@ -41,13 +41,13 @@ static bool q_bridge_debug = false;
 void q_bridge_start(char *src, char *dst, bool debug) {
 	q_ring_t n, k;
 	q_ring_data_t r;
-	
+
 	q_bridge_debug = debug;
 
-	// Create a ring for each interface	
+	// Create a ring for each interface
 	n = q_ring_new(src);
 	k = q_ring_new(dst);
-	
+
 	while (1) {
 		// Read from source interface and dispatch results (q_ring_data_t)
 		// to destination interface
@@ -61,11 +61,11 @@ void q_bridge_start(char *src, char *dst, bool debug) {
 			q_bridge_dispatch(n, r);
 			q_ring_ready(r);
 		}
-		
+
 		// Flushes each ring if data was dispatched to it
 		q_ring_flush(n, false);
 		q_ring_flush(k, false);
-		
+
 		// Yield until data is available on either interface
 		q_ring_yield_dbl(n, k);
 	}
@@ -82,7 +82,7 @@ void q_bridge_start(char *src, char *dst, bool debug) {
 void q_bridge_dispatch(q_ring_t n, q_ring_data_t r) {
 	uint8_t *buf;
 	uint32_t len;
-	
+
 	// Determine if packet type matches a packet that we should
 	// relay to target ring
 	if (r->sll->sll_pkttype != PACKET_HOST &&
@@ -148,7 +148,7 @@ void q_bridge_checksum(uint8_t *buf, uint32_t len) {
 	// Calculate IP checksum using one's complement
 	ip->check = 0;
 	ip->check = q_bridge_checksum_ip((uint16_t*)ip, sizeof(*ip));
-	
+
 	// Calculate checksum for various IP protocols
 	switch (ip->protocol) {
 		case IPPROTO_TCP:
@@ -158,7 +158,7 @@ void q_bridge_checksum(uint8_t *buf, uint32_t len) {
 			tcp->check = q_bridge_checksum_ip_proto((uint16_t*)tcp, sizeof(*tcp) + len,
 					IPPROTO_TCP, ip->saddr, ip->daddr);
 			break;
-			
+
 		case IPPROTO_UDP:
 			if (!POP_HEADER(udp, buf, len))
 				return;
@@ -166,7 +166,7 @@ void q_bridge_checksum(uint8_t *buf, uint32_t len) {
 			udp->check = q_bridge_checksum_ip_proto((uint16_t*)udp, sizeof(*udp) + len,
 					IPPROTO_UDP, ip->saddr, ip->daddr);
 			break;
-			
+
 		case IPPROTO_ICMP:
 			if (!POP_HEADER(icmp, buf, len))
 				return;
@@ -181,12 +181,12 @@ uint16_t q_bridge_checksum_ip(uint16_t *buf, uint32_t len) {
 	uint32_t sum;
 	uint16_t *w;
 	uint32_t nleft;
-	
+
 	// One's complement checksum routine
 	sum = 0;
 	nleft = len;
 	w = buf;
-	
+
 	while (nleft > 1) {
 		sum += *w++;
 		nleft -= 2;
@@ -194,7 +194,7 @@ uint16_t q_bridge_checksum_ip(uint16_t *buf, uint32_t len) {
 
 	if (nleft > 0)
 		sum += *w & 0xFF;
-	
+
 	sum = (sum >> 16) + (sum & 0xFFFF);
 	sum += (sum >> 16);
 	return ~sum;
@@ -205,33 +205,33 @@ uint16_t q_bridge_checksum_ip_proto(uint16_t *buf, uint16_t len, uint16_t proto,
 	uint16_t *ip_src, *ip_dst;
 	uint32_t sum;
 	uint16_t length;
-	
+
 	// Checksum is usually derived from pseudo-header of IP protocol, but
 	// a better way would be to simply include the header in place
 	sum = 0;
 	length = len;
 	ip_src = (uint16_t*)&src_addr;
 	ip_dst = (uint16_t*)&dest_addr;
-	
+
 	while (len > 1) {
 		sum += *buf++;
 		if (sum & 0x80000000)
 			sum = (sum & 0xFFFF) + (sum >> 16);
 		len -= 2;
 	}
-	
+
 	if (len & 1)
 		sum += *((uint8_t*)buf);
-	
+
 	sum += *(ip_src++);
 	sum += *ip_src;
 	sum += *(ip_dst++);
 	sum += *ip_dst;
 	sum += htons(proto);
 	sum += htons(length);
-	
+
 	while (sum >> 16)
 		sum = (sum & 0xFFFF) + (sum >> 16);
-	
+
 	return ((uint16_t)(~sum));
 }

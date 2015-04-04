@@ -59,11 +59,11 @@ void q_ring_setup(q_ring_t n, q_ring_group_t g, uint32_t direct) {
 	q_ring_data_t ring;
 	int32_t val, hdr_size;
 	uint32_t i;
-	
+
 	// Frame size must be atleast the size of the MTU, if it was smaller
 	// no packets could be retreived/sent
 	static_assert(Q_RING_FRAME_SIZE > Q_RING_MTU);
-	
+
 	// Open raw socket and set TPACKET option
 	if ((g->fd = socket(AF_PACKET, SOCK_RAW, 0)) < 0)
 		error("socket: %s", strerror(errno));
@@ -86,7 +86,7 @@ void q_ring_setup(q_ring_t n, q_ring_group_t g, uint32_t direct) {
 	g->map = mmap(NULL, g->map_len, PROT_READ | PROT_WRITE, MAP_SHARED, g->fd, 0);
 	if (g->map == MAP_FAILED)
 		error("mmap: %s", strerror(errno));
-	
+
 	// Initialize a pointer to each frame in the ring, the frame must
 	// be TPACKET_ALIGN'd
 	ring = calloc(g->req.tp_frame_nr * sizeof(*ring), 1);
@@ -125,28 +125,28 @@ void q_ring_bind(q_ring_t n, char *device) {
 	struct ifreq s_ifr;
 	struct ethtool_value eval;
 	int32_t fd;
-	
+
 	// Find interface index and MTU sing device name
 	if ((fd = socket(PF_INET, SOCK_DGRAM, IPPROTO_IP)) < 0)
 		error("socket: %s", strerror(errno));
-	
+
 	memset(&s_ifr, 0, sizeof(s_ifr));
 	strncpy(s_ifr.ifr_name, device, sizeof(s_ifr.ifr_name));
-	
+
 	if (ioctl(fd, SIOCGIFINDEX, &s_ifr) < 0)
 		error("ioctl: %s", strerror(errno));
 	n->ifindex = s_ifr.ifr_ifindex;
-	
+
 	if (ioctl(fd, SIOCGIFMTU, &s_ifr) < 0)
 		error("ioctl: %s", strerror(errno));
 	n->mtu = s_ifr.ifr_mtu;
-	
+
 	// The MTU of the device must be ETH_DATA_LEN, could allow a variable sized
 	// MTU, but it complicates the code a bit
 	if (n->mtu != Q_RING_MTU)
 		error("Device %s has an is incorrect MTU (%u, should be %u)",
 			device, n->mtu, Q_RING_MTU);
-	
+
 	// Loopback devices are not allowed, make sure promisc mode is enabled
 	if (ioctl(fd, SIOCGIFFLAGS, &s_ifr) < 0)
 		error("ioctl: %s", strerror(errno));
@@ -154,53 +154,53 @@ void q_ring_bind(q_ring_t n, char *device) {
 		error("Device %s is a loopback device and cannot be bridged", device);
 	if (!(s_ifr.ifr_flags & IFF_PROMISC)) {
 		warning("Device %s has promisc mode disabled, enabling it", device);
-		
+
 		s_ifr.ifr_flags |= IFF_PROMISC;
 		if (ioctl(fd, SIOCSIFFLAGS, &s_ifr) < 0)
 			error("ioctl: %s", strerror(errno));
 	}
-	
+
 	// Large/Generic Receive Offloading and TCP Segmentation Offloading will not work
 	// with this bridge and must be disabled. This hopefully wont cause unexpected side
 	// effects with unsuspecting users
 	s_ifr.ifr_data = (void*)&eval;
-	
+
 	eval.cmd = ETHTOOL_GFLAGS;
 	if (ioctl(fd, SIOCETHTOOL, &s_ifr) < 0)
 		error("ioctl: %s", strerror(errno));
 	if ((eval.data & ETH_FLAG_LRO)) {
 		warning("Device %s has LRO enabled, disabling it", device);
-		
+
 		eval.cmd = ETHTOOL_SFLAGS;
 		eval.data &= ~ETH_FLAG_LRO;
 		if (ioctl(fd, SIOCETHTOOL, &s_ifr) < 0)
 			error("ioctl: %s", strerror(errno));
 	}
-	
+
 	eval.cmd = ETHTOOL_GGRO;
 	if (ioctl(fd, SIOCETHTOOL, &s_ifr) < 0)
 		error("ioctl: %s", strerror(errno));
 	if (eval.data) {
 		warning("Device %s has GRO enabled, disabling it", device);
-		
+
 		eval.cmd = ETHTOOL_SGRO;
 		eval.data = 0;
 		if (ioctl(fd, SIOCETHTOOL, &s_ifr) < 0)
 			error("ioctl: %s", strerror(errno));
 	}
-	
+
 	eval.cmd = ETHTOOL_GTSO;
 	if (ioctl(fd, SIOCETHTOOL, &s_ifr) < 0)
 		error("ioctl: %s", strerror(errno));
 	if (eval.data) {
 		warning("Device %s has TSO enabled, disabling it", device);
-		
+
 		eval.cmd = ETHTOOL_STSO;
 		eval.data = 0;
 		if (ioctl(fd, SIOCETHTOOL, &s_ifr) < 0)
 			error("ioctl: %s", strerror(errno));
 	}
-	
+
 	close(fd);
 }
 
@@ -210,13 +210,13 @@ void q_ring_bind(q_ring_t n, char *device) {
 q_ring_data_t q_ring_read(q_ring_t n) {
 	q_ring_group_t g;
 	q_ring_data_t r;
-	
+
 	// Use RX ring to read data, check if new data is available
 	g = n->rx;
 	r = g->r;
 	if (!r->hdr->tp_status)
 		return NULL;
-		
+
 	// Memory barrier
 	__sync_synchronize();
 
@@ -236,7 +236,7 @@ void q_ring_ready(q_ring_data_t r) {
 void q_ring_write(q_ring_t n, uint8_t *buf, uint32_t len) {
 	q_ring_group_t g;
 	q_ring_data_t r;
-	
+
 	// Use TX ring to write data
 	g = n->tx;
 	r = g->r;
@@ -246,19 +246,19 @@ void q_ring_write(q_ring_t n, uint8_t *buf, uint32_t len) {
 		switch (r->hdr->tp_status) {
 			case TP_STATUS_AVAILABLE:
 				break;
-				
+
 			case TP_STATUS_SEND_REQUEST:
 			case TP_STATUS_SENDING:
 				q_ring_flush(n, true);
 				usleep(0);
 				break;
-				
+
 			case TP_STATUS_WRONG_FORMAT:
 			default:
 				error("An error has occured during transmission");
 		}
 	}
-	
+
 	// This shouldn't happen, but check anyway
 	if (len > r->len)
 		error("Packet too large for transmission");
@@ -267,12 +267,12 @@ void q_ring_write(q_ring_t n, uint8_t *buf, uint32_t len) {
 	memcpy(r->buf, buf, len);
 	r->hdr->tp_len = len;
 	r->hdr->tp_status = TP_STATUS_SEND_REQUEST;
-		
+
 	n->pending_write++;
-	
+
 	// Memory barrier
 	__sync_synchronize();
-	
+
 	// Increment circular buffer while wrapping around
 	// to the end of the list
 	if (++g->r == g->r_end)
@@ -281,24 +281,24 @@ void q_ring_write(q_ring_t n, uint8_t *buf, uint32_t len) {
 
 void q_ring_yield(q_ring_t n) {
 	struct pollfd pfd[1];
-	
+
 	// Wait for status change on ring n
 	pfd[0].fd = n->rx->fd;
 	pfd[0].events = POLLIN;
-	
+
 	poll(pfd, sizearr(pfd), -1);
 }
 
 void q_ring_yield_dbl(q_ring_t n1, q_ring_t n2) {
 	struct pollfd pfd[2];
-	
+
 	// Wait for status change on ring n or n2
 	pfd[0].fd = n1->rx->fd;
 	pfd[0].events = POLLIN;
-	
+
 	pfd[1].fd = n2->rx->fd;
 	pfd[1].events = POLLIN;
-	
+
 	poll(pfd, sizearr(pfd), -1);
 }
 
@@ -329,7 +329,7 @@ void q_ring_data_debug(q_ring_data_t r) {
 	q_decode_parse(r->blk + r->hdr->tp_mac, r->hdr->tp_len);
 #else
 	static char *pkttype[] = { "<", "B", "M", "P", ">" };
-	
+
 	printf("%u.%09u: if%u %s %u bytes\n",
 		r->hdr->tp_sec,
 		r->hdr->tp_nsec,
@@ -346,9 +346,9 @@ void q_ring_data_debug(q_ring_data_t r) {
 void q_ring_free(q_ring_t n) {
 	close(n->rx->fd);
 	close(n->tx->fd);
-	
+
 	munmap(n->rx->map, n->rx->map_len);
 	munmap(n->tx->map, n->tx->map_len);
-	
+
 	free(n);
 }
