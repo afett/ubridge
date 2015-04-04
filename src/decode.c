@@ -494,7 +494,7 @@ int q_decode_data(uint8_t *buf, uint32_t len) {
 #ifndef Q_DECODE_CONF_SHORT
 #ifdef Q_DECODE_CONF_ASCII
 	uint8_t *str, *ptr;
-	int32_t n;
+	uint32_t n;
 
 	// Print the remaining packet as printable ASCII string
 	str = malloc((len * 4) + 1);
@@ -552,7 +552,7 @@ int q_decode_data(uint8_t *buf, uint32_t len) {
 #else
 #ifdef Q_DECODE_CONF_HEX
 	uint8_t *str, *ptr;
-	int32_t n;
+	uint32_t n;
 
 	// Print the remaining packet as a series of 2 digit hex
 	str = malloc((len * 3) + 1);
