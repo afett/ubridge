@@ -52,7 +52,7 @@ void q_decode_parse(uint8_t *buf, uint32_t len) {
 	// decoding function to be called next
 	q_decode_func = q_decode_pkt;
 
-	while (len >= 0) {
+	while (len != 0) {
 		if (!q_decode_func)
 			break;
 		ret = q_decode_func(buf, len);
