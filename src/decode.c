@@ -64,6 +64,7 @@ void q_decode_parse(uint8_t *buf, uint32_t len) {
 }
 
 int q_decode_pkt(uint8_t *buf, uint32_t len) {
+	(void) buf;
 	struct timeval tv;
 	struct timezone tvp;
 	struct tm tm;
