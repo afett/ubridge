@@ -19,7 +19,7 @@ SRC =		$(patsubst %.c,%.o,$(wildcard ${SRC_PATH}/*.c)) \
 		$(patsubst %.c,%.o,$(wildcard ${SRC_PATH}/*/*/*.c))
 
 LINK_ARG =	-pthread
-COMPILE_ARG =	-g -iquote ${SRC_PATH} -Wimplicit -Wall -Wextra \
+COMPILE_ARG =	-g -iquote ${SRC_PATH} -Wimplicit -Wall -Wextra -Werror \
 		--std=gnu99 -DVERSION=\"${VERSION}\"
 
 ###################################################
