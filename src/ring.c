@@ -57,7 +57,8 @@ void q_ring_setup(q_ring_t n, q_ring_group_t g, uint32_t direct) {
 	struct sockaddr_ll addr;
 	struct packet_mreq mr;
 	q_ring_data_t ring;
-	int32_t val, hdr_size, i;
+	int32_t val, hdr_size;
+	uint32_t i;
 	
 	// Frame size must be atleast the size of the MTU, if it was smaller
 	// no packets could be retreived/sent
