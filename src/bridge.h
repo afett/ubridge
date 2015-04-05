@@ -51,7 +51,7 @@ typedef struct q_bridge_t {
 
 q_bridge_t q_bridge_new(bool debug);
 
-void q_bridge_add(q_bridge_t b, char *ifname);
+void q_bridge_add(q_bridge_t b, const char *ifname);
 
 void q_bridge_start(q_bridge_t b);
 

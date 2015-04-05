@@ -68,13 +68,13 @@
 // Section:     Prototypes for private methods
 
 static void q_ring_setup(q_ring_t n, q_ring_group_t g, uint32_t direct);
-static void q_ring_bind(q_ring_t n, char *device);
+static void q_ring_bind(q_ring_t n, const char *device);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Section:     Ring setup
 // Description: Creates a new packet ring based upon interface device
 
-q_ring_t q_ring_new(char *device) {
+q_ring_t q_ring_new(const char *device) {
 	q_ring_t n;
 
 	// Create object that holds device information
@@ -153,7 +153,7 @@ static void q_ring_setup(q_ring_t n, q_ring_group_t g, uint32_t direct) {
 		error("setsockopt: %s", strerror(errno));
 }
 
-static void q_ring_bind(q_ring_t n, char *device) {
+static void q_ring_bind(q_ring_t n, const char *device) {
 	struct ifreq s_ifr;
 	struct ethtool_value eval;
 	int32_t fd;

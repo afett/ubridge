@@ -78,7 +78,7 @@ typedef struct q_ring_t {
 ////////////////////////////////////////////////////////////////////////////////
 // Section:     Public functions
 
-q_ring_t q_ring_new(char *device);
+q_ring_t q_ring_new(const char *device);
 
 q_ring_data_t q_ring_read(q_ring_t n);
 void q_ring_ready(q_ring_data_t r);

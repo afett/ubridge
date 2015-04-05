@@ -76,7 +76,7 @@ q_bridge_t q_bridge_new(bool debug)
 ////////////////////////////////////////////////////////////////////////////////
 // Section:     Add bridge interface
 
-void q_bridge_add(q_bridge_t b, char *ifname)
+void q_bridge_add(q_bridge_t b, const char *ifname)
 {
 	if (b->nrings == sizearr(b->ring)) {
 		error("Can't add interface, max size is %zu", sizearr(b->ring));
