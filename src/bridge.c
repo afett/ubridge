@@ -102,10 +102,10 @@ void q_bridge_start(q_bridge_t b) {
 	}
 
 	while (1) {
-		q_bridge_iterate_once(b);
-
 		// Yield until data is available on either interface
 		q_ring_yield_dbl(b->ring[0], b->ring[1]);
+
+		q_bridge_iterate_once(b);
 	}
 
 	// Cannot be reached
