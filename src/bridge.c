@@ -313,7 +313,9 @@ static uint16_t q_bridge_checksum_ip_proto(uint16_t *buf, uint16_t len, uint16_t
 
 void q_bridge_free(q_bridge_t b)
 {
-	q_ring_free(b->ring[0]);
-	q_ring_free(b->ring[1]);
+	size_t idx;
+	for (idx = 0; idx < b->nrings; ++idx) {
+		q_ring_free(b->ring[idx]);
+	}
 	free(b);
 }
