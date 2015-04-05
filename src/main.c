@@ -168,9 +168,12 @@ int main(int argc, char **argv) {
 	}
 
 	b = q_bridge_new(debug);
+	q_bridge_add(b, src);
+	q_bridge_add(b, dst);
 
 	// Main bridge loop
-	q_bridge_start(b, src, dst);
+	q_bridge_start(b);
+
 	q_bridge_free(b);
 	return 0;
 }

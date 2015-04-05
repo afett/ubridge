@@ -74,16 +74,31 @@ q_bridge_t q_bridge_new(bool debug)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// Section:     Add bridge interface
+
+void q_bridge_add(q_bridge_t b, char *ifname)
+{
+	if (b->nrings == sizearr(b->ring)) {
+		error("Can't add interface, max size is %zu", sizearr(b->ring));
+	}
+
+	// Create a ring for the new interface
+	b->ring[b->nrings] = q_ring_new(ifname);
+	++b->nrings;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // Section:     Start bridge
 // Description: The bridge loop reads from each ring and writes to it's
 //              counterpart
 
-void q_bridge_start(q_bridge_t b, char *src, char *dst) {
+void q_bridge_start(q_bridge_t b) {
 	q_ring_data_t r;
 
-	// Create a ring for each interface
-	b->ring[0] = q_ring_new(src);
-	b->ring[1] = q_ring_new(dst);
+	if (b->nrings < 2) {
+		error("Can't start, only have %zu interfaces", b->nrings);
+		// no return
+	}
 
 	while (1) {
 		// Read from source interface and dispatch results (q_ring_data_t)
