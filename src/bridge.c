@@ -62,6 +62,7 @@ static uint16_t q_bridge_checksum_ip(uint16_t *buf, uint32_t len);
 static uint16_t q_bridge_checksum_ip_proto(uint16_t *buf, uint16_t len, uint16_t proto,
 		in_addr_t src_addr, in_addr_t dest_addr);
 static void q_bridge_iterate_once(q_bridge_t b);
+static void q_bridge_drain_ring(q_bridge_t b, size_t idx);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Section:     Create a new bridge
@@ -112,24 +113,37 @@ void q_bridge_start(q_bridge_t b) {
 
 static void q_bridge_iterate_once(q_bridge_t b)
 {
+	size_t idx;
+	// drain all rings
+	for (idx = 0; idx < b->nrings; ++idx) {
+		q_bridge_drain_ring(b, idx);
+	}
+}
+
+static void q_bridge_drain_ring(q_bridge_t b, size_t idx)
+{
 	q_ring_data_t r;
+	size_t didx;
 
 	// Read from source interface and dispatch results (q_ring_data_t)
 	// to destination interface
-	while ((r = q_ring_read(b->ring[0]))) {
-		q_bridge_dispatch(b, b->ring[1], r);
+	while ((r = q_ring_read(b->ring[idx]))) {
+		for (didx = 0; didx < b->nrings; ++didx) {
+			if (didx == idx) {
+				continue;
+			}
+			q_bridge_dispatch(b, b->ring[didx], r);
+		}
 		q_ring_ready(r);
 	}
 
-	// Reads from destination interface to source interface
-	while ((r = q_ring_read(b->ring[1]))) {
-		q_bridge_dispatch(b, b->ring[0], r);
-		q_ring_ready(r);
+	// Flushes dest ring if data was dispatched to it
+	for (didx = 0; didx < b->nrings; ++didx) {
+		if (didx == idx) {
+			continue;
+		}
+		q_ring_flush(b->ring[didx], false);
 	}
-
-	// Flushes each ring if data was dispatched to it
-	q_ring_flush(b->ring[0], false);
-	q_ring_flush(b->ring[1], false);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
