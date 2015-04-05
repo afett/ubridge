@@ -83,7 +83,6 @@ q_ring_t q_ring_new(const char *device);
 q_ring_data_t q_ring_read(q_ring_t n);
 void q_ring_ready(q_ring_data_t r);
 void q_ring_write(q_ring_t n, uint8_t *buf, uint32_t len);
-void q_ring_yield_dbl(q_ring_t n1, q_ring_t n2);
 void q_ring_flush(q_ring_t n, bool block);
 
 void q_ring_data_debug(q_ring_data_t r);

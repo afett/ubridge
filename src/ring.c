@@ -311,19 +311,6 @@ void q_ring_write(q_ring_t n, uint8_t *buf, uint32_t len) {
 		g->r = g->r_start;
 }
 
-void q_ring_yield_dbl(q_ring_t n1, q_ring_t n2) {
-	struct pollfd pfd[2];
-
-	// Wait for status change on ring n or n2
-	pfd[0].fd = n1->rx->fd;
-	pfd[0].events = POLLIN;
-
-	pfd[1].fd = n2->rx->fd;
-	pfd[1].events = POLLIN;
-
-	poll(pfd, sizearr(pfd), -1);
-}
-
 void q_ring_flush(q_ring_t n, bool block) {
 	// Wait for kernel to flush data in TX ring, pending_write should be set to the
 	// number of pending frames

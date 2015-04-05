@@ -62,7 +62,6 @@ static void q_bridge_checksum(uint8_t *buf, uint32_t len);
 static uint16_t q_bridge_checksum_ip(uint16_t *buf, uint32_t len);
 static uint16_t q_bridge_checksum_ip_proto(uint16_t *buf, uint16_t len, uint16_t proto,
 		in_addr_t src_addr, in_addr_t dest_addr);
-static void q_bridge_iterate_once(q_bridge_t b);
 static void q_bridge_drain_ring(q_bridge_t b, size_t idx);
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -85,12 +84,21 @@ q_bridge_t q_bridge_new(bool debug)
 
 void q_bridge_add(q_bridge_t b, const char *ifname)
 {
+	q_ring_t n;
+	struct epoll_event ev;
+
 	if (b->nrings == sizearr(b->ring)) {
 		error("Can't add interface, max size is %zu", sizearr(b->ring));
 	}
 
 	// Create a ring for the new interface
-	b->ring[b->nrings] = q_ring_new(ifname);
+	n = q_ring_new(ifname);
+	ev.events = EPOLLIN;
+	ev.data.u64 = b->nrings;
+	if (epoll_ctl(b->epollfd, EPOLL_CTL_ADD, n->tx->fd, &ev) != 0) {
+		error("Failed to add fd to epoll set: %s", strerror(errno));
+	}
+	b->ring[b->nrings] = n;
 	++b->nrings;
 }
 
@@ -100,6 +108,8 @@ void q_bridge_add(q_bridge_t b, const char *ifname)
 //              counterpart
 
 void q_bridge_start(q_bridge_t b) {
+	struct epoll_event ev[Q_BRIGE_MAXIF];
+	int nfd, i;
 
 	if (b->nrings < 2) {
 		error("Can't start, only have %zu interfaces", b->nrings);
@@ -108,21 +118,19 @@ void q_bridge_start(q_bridge_t b) {
 
 	while (1) {
 		// Yield until data is available on either interface
-		q_ring_yield_dbl(b->ring[0], b->ring[1]);
+		nfd = epoll_wait(b->epollfd, ev, b->nrings, -1);
+		if (nfd <= 0) {
+			error("error in epoll_wait: %s", strerror(errno));
+		}
 
-		q_bridge_iterate_once(b);
+		for (i = 0; i < nfd; ++i) {
+			if (ev[i].events & EPOLLIN) {
+				q_bridge_drain_ring(b, ev[i].data.u64);
+			}
+		}
 	}
 
 	// Cannot be reached
-}
-
-static void q_bridge_iterate_once(q_bridge_t b)
-{
-	size_t idx;
-	// drain all rings
-	for (idx = 0; idx < b->nrings; ++idx) {
-		q_bridge_drain_ring(b, idx);
-	}
 }
 
 static void q_bridge_drain_ring(q_bridge_t b, size_t idx)
