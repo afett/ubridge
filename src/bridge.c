@@ -61,6 +61,7 @@ static void q_bridge_checksum(uint8_t *buf, uint32_t len);
 static uint16_t q_bridge_checksum_ip(uint16_t *buf, uint32_t len);
 static uint16_t q_bridge_checksum_ip_proto(uint16_t *buf, uint16_t len, uint16_t proto,
 		in_addr_t src_addr, in_addr_t dest_addr);
+static void q_bridge_iterate_once(q_bridge_t b);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Section:     Create a new bridge
@@ -93,7 +94,6 @@ void q_bridge_add(q_bridge_t b, const char *ifname)
 //              counterpart
 
 void q_bridge_start(q_bridge_t b) {
-	q_ring_data_t r;
 
 	if (b->nrings < 2) {
 		error("Can't start, only have %zu interfaces", b->nrings);
@@ -101,28 +101,35 @@ void q_bridge_start(q_bridge_t b) {
 	}
 
 	while (1) {
-		// Read from source interface and dispatch results (q_ring_data_t)
-		// to destination interface
-		while ((r = q_ring_read(b->ring[0]))) {
-			q_bridge_dispatch(b, b->ring[1], r);
-			q_ring_ready(r);
-		}
-
-		// Reads from destination interface to source interface
-		while ((r = q_ring_read(b->ring[1]))) {
-			q_bridge_dispatch(b, b->ring[0], r);
-			q_ring_ready(r);
-		}
-
-		// Flushes each ring if data was dispatched to it
-		q_ring_flush(b->ring[0], false);
-		q_ring_flush(b->ring[1], false);
+		q_bridge_iterate_once(b);
 
 		// Yield until data is available on either interface
 		q_ring_yield_dbl(b->ring[0], b->ring[1]);
 	}
 
 	// Cannot be reached
+}
+
+static void q_bridge_iterate_once(q_bridge_t b)
+{
+	q_ring_data_t r;
+
+	// Read from source interface and dispatch results (q_ring_data_t)
+	// to destination interface
+	while ((r = q_ring_read(b->ring[0]))) {
+		q_bridge_dispatch(b, b->ring[1], r);
+		q_ring_ready(r);
+	}
+
+	// Reads from destination interface to source interface
+	while ((r = q_ring_read(b->ring[1]))) {
+		q_bridge_dispatch(b, b->ring[0], r);
+		q_ring_ready(r);
+	}
+
+	// Flushes each ring if data was dispatched to it
+	q_ring_flush(b->ring[0], false);
+	q_ring_flush(b->ring[1], false);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
