@@ -53,12 +53,14 @@
 
 enum {
 	OPTION_DEBUG,
+	OPTION_DONTFORK,
 	OPTION_HELP,
 	OPTION_VERSION,
 };
 
 static struct option option_fields[] = {
 	{ "debug",		0,	0,	OPTION_DEBUG			},
+	{ "dontfork",		0,	0,	OPTION_DONTFORK			},
 	{ "help",		0,	0,	OPTION_HELP			},
 	{ "version",		0,	0,	OPTION_VERSION			},
 	{ NULL,			0,	0,	0				}
@@ -71,7 +73,8 @@ static struct option option_fields[] = {
 void help() {
 	printf("\n");
 	printf("Usage: ubridge [OPTIONS] interface interface [interface...]\n");
-	printf("\t%-25s Run in foreground and print packets\n",	"--debug");
+	printf("\t%-25s Print packets (implies --dontfork)\n",	"--debug");
+	printf("\t%-25s Run in foreground\n",			"--dontfork");
 	printf("\t%-25s Displays this help screen\n",		"--help");
 	printf("\t%-25s Displays version information\n",	"--version");
 	printf("\n");
@@ -92,10 +95,11 @@ void version() {
 
 int main(int argc, char **argv) {
 	int32_t c;
-	bool debug;
+	bool debug, dontfork;
 	q_bridge_t b;
 
 	debug = false;
+	dontfork = false;
 	b = NULL;
 
 	while (1) {
@@ -106,6 +110,10 @@ int main(int argc, char **argv) {
 		switch (c) {
 			case OPTION_DEBUG:
 				debug = true;
+				// fallthrough
+
+			case OPTION_DONTFORK:
+				dontfork = true;
 				break;
 
 			case OPTION_HELP:
@@ -135,7 +143,7 @@ int main(int argc, char **argv) {
 	}
 
 	// If debugging is turned off, fork process into the background and close fd's
-	if (!debug) {
+	if (!dontfork) {
 		if (daemon(1, 0) < 0)
 			error("Error forking process");
 	}
