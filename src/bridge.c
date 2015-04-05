@@ -55,6 +55,14 @@
 // Description: Network bridge
 
 ////////////////////////////////////////////////////////////////////////////////
+// Section:     Prototypes for private methods
+static void q_bridge_dispatch(q_bridge_t b, q_ring_t n, q_ring_data_t r);
+static void q_bridge_checksum(uint8_t *buf, uint32_t len);
+static uint16_t q_bridge_checksum_ip(uint16_t *buf, uint32_t len);
+static uint16_t q_bridge_checksum_ip_proto(uint16_t *buf, uint16_t len, uint16_t proto,
+		in_addr_t src_addr, in_addr_t dest_addr);
+
+////////////////////////////////////////////////////////////////////////////////
 // Section:     Create a new bridge
 
 q_bridge_t q_bridge_new(bool debug)
@@ -109,7 +117,7 @@ void q_bridge_start(q_bridge_t b, char *src, char *dst) {
 // Section:     Dispatch packet
 // Description: Writes packet to target ring
 
-void q_bridge_dispatch(q_bridge_t b, q_ring_t n, q_ring_data_t r) {
+static void q_bridge_dispatch(q_bridge_t b, q_ring_t n, q_ring_data_t r) {
 	uint8_t *buf;
 	uint32_t len;
 
@@ -157,7 +165,7 @@ void q_bridge_dispatch(q_bridge_t b, q_ring_t n, q_ring_data_t r) {
 			true : false);			\
 	})
 
-void q_bridge_checksum(uint8_t *buf, uint32_t len) {
+static void q_bridge_checksum(uint8_t *buf, uint32_t len) {
 	struct ethhdr *eth;
 	struct iphdr *ip;
 	struct tcphdr *tcp;
@@ -207,7 +215,7 @@ void q_bridge_checksum(uint8_t *buf, uint32_t len) {
 	}
 }
 
-uint16_t q_bridge_checksum_ip(uint16_t *buf, uint32_t len) {
+static uint16_t q_bridge_checksum_ip(uint16_t *buf, uint32_t len) {
 	uint32_t sum;
 	uint16_t *w;
 	uint32_t nleft;
@@ -230,7 +238,7 @@ uint16_t q_bridge_checksum_ip(uint16_t *buf, uint32_t len) {
 	return ~sum;
 }
 
-uint16_t q_bridge_checksum_ip_proto(uint16_t *buf, uint16_t len, uint16_t proto,
+static uint16_t q_bridge_checksum_ip_proto(uint16_t *buf, uint16_t len, uint16_t proto,
 		in_addr_t src_addr, in_addr_t dest_addr) {
 	uint16_t *ip_src, *ip_dst;
 	uint32_t sum;

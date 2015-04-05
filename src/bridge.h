@@ -54,11 +54,4 @@ q_bridge_t q_bridge_new(bool debug);
 
 void q_bridge_start(q_bridge_t b, char *src, char *dst);
 
-void q_bridge_dispatch(q_bridge_t, q_ring_t n, q_ring_data_t r);
-
-void q_bridge_checksum(uint8_t *buf, uint32_t len);
-uint16_t q_bridge_checksum_ip(uint16_t *buf, uint32_t len);
-uint16_t q_bridge_checksum_ip_proto(uint16_t *buf, uint16_t len, uint16_t proto,
-		in_addr_t src_addr, in_addr_t dest_addr);
-
 void q_bridge_free(q_bridge_t b);
