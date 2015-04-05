@@ -65,6 +65,12 @@
 // Description: Network packet ring
 
 ////////////////////////////////////////////////////////////////////////////////
+// Section:     Prototypes for private methods
+
+static void q_ring_setup(q_ring_t n, q_ring_group_t g, uint32_t direct);
+static void q_ring_bind(q_ring_t n, char *device);
+
+////////////////////////////////////////////////////////////////////////////////
 // Section:     Ring setup
 // Description: Creates a new packet ring based upon interface device
 
@@ -79,7 +85,7 @@ q_ring_t q_ring_new(char *device) {
 	return n;
 }
 
-void q_ring_setup(q_ring_t n, q_ring_group_t g, uint32_t direct) {
+static void q_ring_setup(q_ring_t n, q_ring_group_t g, uint32_t direct) {
 	struct sockaddr_ll addr;
 	struct packet_mreq mr;
 	q_ring_data_t ring;
@@ -147,7 +153,7 @@ void q_ring_setup(q_ring_t n, q_ring_group_t g, uint32_t direct) {
 		error("setsockopt: %s", strerror(errno));
 }
 
-void q_ring_bind(q_ring_t n, char *device) {
+static void q_ring_bind(q_ring_t n, char *device) {
 	struct ifreq s_ifr;
 	struct ethtool_value eval;
 	int32_t fd;
