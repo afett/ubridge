@@ -79,38 +79,35 @@ q_bridge_t q_bridge_new(bool debug)
 //              counterpart
 
 void q_bridge_start(q_bridge_t b, char *src, char *dst) {
-	q_ring_t n, k;
 	q_ring_data_t r;
 
 	// Create a ring for each interface
-	n = q_ring_new(src);
-	k = q_ring_new(dst);
+	b->ring[0] = q_ring_new(src);
+	b->ring[1] = q_ring_new(dst);
 
 	while (1) {
 		// Read from source interface and dispatch results (q_ring_data_t)
 		// to destination interface
-		while ((r = q_ring_read(n))) {
-			q_bridge_dispatch(b, k, r);
+		while ((r = q_ring_read(b->ring[0]))) {
+			q_bridge_dispatch(b, b->ring[1], r);
 			q_ring_ready(r);
 		}
 
 		// Reads from destination interface to source interface
-		while ((r = q_ring_read(k))) {
-			q_bridge_dispatch(b, n, r);
+		while ((r = q_ring_read(b->ring[1]))) {
+			q_bridge_dispatch(b, b->ring[0], r);
 			q_ring_ready(r);
 		}
 
 		// Flushes each ring if data was dispatched to it
-		q_ring_flush(n, false);
-		q_ring_flush(k, false);
+		q_ring_flush(b->ring[0], false);
+		q_ring_flush(b->ring[1], false);
 
 		// Yield until data is available on either interface
-		q_ring_yield_dbl(n, k);
+		q_ring_yield_dbl(b->ring[0], b->ring[1]);
 	}
 
-	// Cannot be reached, but clean-up just in case
-	q_ring_free(n);
-	q_ring_free(k);
+	// Cannot be reached
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -280,5 +277,7 @@ static uint16_t q_bridge_checksum_ip_proto(uint16_t *buf, uint16_t len, uint16_t
 
 void q_bridge_free(q_bridge_t b)
 {
+	q_ring_free(b->ring[0]);
+	q_ring_free(b->ring[1]);
 	free(b);
 }
