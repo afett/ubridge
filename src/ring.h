@@ -63,7 +63,7 @@ typedef struct q_ring_data {
 } *q_ring_data_t;
 
 typedef struct q_ring_group_t {
-	int32_t fd;
+	int fd;
 	struct tpacket_req req;
 	uint8_t *map;
 	uint32_t map_len;

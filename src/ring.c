@@ -156,7 +156,7 @@ static void q_ring_setup(q_ring_t n, q_ring_group_t g, uint32_t direct) {
 static void q_ring_bind(q_ring_t n, const char *device) {
 	struct ifreq s_ifr;
 	struct ethtool_value eval;
-	int32_t fd;
+	int fd;
 
 	// Find interface index and MTU sing device name
 	if ((fd = socket(PF_INET, SOCK_DGRAM, IPPROTO_IP)) < 0)
