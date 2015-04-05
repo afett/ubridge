@@ -53,18 +53,12 @@
 
 enum {
 	OPTION_DEBUG,
-	OPTION_SRC,
-	OPTION_DST,
-
 	OPTION_HELP,
 	OPTION_VERSION,
 };
 
 static struct option option_fields[] = {
 	{ "debug",		0,	0,	OPTION_DEBUG			},
-	{ "src",		1,	0,	OPTION_SRC			},
-	{ "dst",		1,	0,	OPTION_DST			},
-
 	{ "help",		0,	0,	OPTION_HELP			},
 	{ "version",		0,	0,	OPTION_VERSION			},
 	{ NULL,			0,	0,	0				}
@@ -76,14 +70,12 @@ static struct option option_fields[] = {
 
 void help() {
 	printf("\n");
-	printf("Usage: ubridge [OPTIONS]...\n");
+	printf("Usage: ubridge [OPTIONS] interface interface [interface...]\n");
 	printf("\t%-25s Run in foreground and print packets\n",	"--debug");
-	printf("\t%-25s Source interface\n",			"--src [if]");
-	printf("\t%-25s Destination interface\n",		"--dst [if]");
 	printf("\t%-25s Displays this help screen\n",		"--help");
 	printf("\t%-25s Displays version information\n",	"--version");
 	printf("\n");
-	printf("Example:  ubridge --debug --src vif1.0 --dst eth0\n");
+	printf("Example:  ubridge --debug vif1.0 eth0\n");
 	printf("\n");
 	exit(1);
 }
@@ -100,12 +92,9 @@ void version() {
 
 int main(int argc, char **argv) {
 	int32_t c;
-	char *src, *dst;
 	bool debug;
 	q_bridge_t b;
 
-	src = NULL;
-	dst = NULL;
 	debug = false;
 	b = NULL;
 
@@ -117,14 +106,6 @@ int main(int argc, char **argv) {
 		switch (c) {
 			case OPTION_DEBUG:
 				debug = true;
-				break;
-
-			case OPTION_SRC:
-				src = optarg;
-				break;
-
-			case OPTION_DST:
-				dst = optarg;
 				break;
 
 			case OPTION_HELP:
@@ -142,23 +123,15 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	// The user entered non-option data
-	if (optind != argc) {
-		warning("Unknown or invalid option at \"%s\"", argv[optind]);
+	if ((argc - optind) < 2) {
+		warning("Must specify at least two interfaces");
 		help();
 		return 0;
 	}
 
-	if (!src) {
-		warning("Must specify source interface using --src");
-		help();
-		return 0;
-	}
-
-	if (!dst) {
-		warning("Must specify destination interface using --dst");
-		help();
-		return 0;
+	b = q_bridge_new(debug);
+	for (;optind != argc; ++optind) {
+		q_bridge_add(b, argv[optind]);
 	}
 
 	// If debugging is turned off, fork process into the background and close fd's
@@ -166,10 +139,6 @@ int main(int argc, char **argv) {
 		if (daemon(1, 0) < 0)
 			error("Error forking process");
 	}
-
-	b = q_bridge_new(debug);
-	q_bridge_add(b, src);
-	q_bridge_add(b, dst);
 
 	// Main bridge loop
 	q_bridge_start(b);
