@@ -1,4 +1,30 @@
 /*
+ * Copyright (c) 2015 Andreas Fett.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ */
+
+/*
  * UBridge: bridge source
  *	By Benjamin Kittridge. Copyright (C) 2012, All rights reserved.
  *
@@ -29,20 +55,24 @@
 // Description: Network bridge
 
 ////////////////////////////////////////////////////////////////////////////////
-// Section:     Global variables
+// Section:     Create a new bridge
 
-static bool q_bridge_debug = false;
+q_bridge_t q_bridge_new(bool debug)
+{
+	q_bridge_t n;
+	n = calloc(sizeof(*n), 1);
+	n->debug = debug;
+	return n;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Section:     Start bridge
 // Description: The bridge loop reads from each ring and writes to it's
 //              counterpart
 
-void q_bridge_start(char *src, char *dst, bool debug) {
+void q_bridge_start(q_bridge_t b, char *src, char *dst) {
 	q_ring_t n, k;
 	q_ring_data_t r;
-
-	q_bridge_debug = debug;
 
 	// Create a ring for each interface
 	n = q_ring_new(src);
@@ -52,13 +82,13 @@ void q_bridge_start(char *src, char *dst, bool debug) {
 		// Read from source interface and dispatch results (q_ring_data_t)
 		// to destination interface
 		while ((r = q_ring_read(n))) {
-			q_bridge_dispatch(k, r);
+			q_bridge_dispatch(b, k, r);
 			q_ring_ready(r);
 		}
 
 		// Reads from destination interface to source interface
 		while ((r = q_ring_read(k))) {
-			q_bridge_dispatch(n, r);
+			q_bridge_dispatch(b, n, r);
 			q_ring_ready(r);
 		}
 
@@ -79,7 +109,7 @@ void q_bridge_start(char *src, char *dst, bool debug) {
 // Section:     Dispatch packet
 // Description: Writes packet to target ring
 
-void q_bridge_dispatch(q_ring_t n, q_ring_data_t r) {
+void q_bridge_dispatch(q_bridge_t b, q_ring_t n, q_ring_data_t r) {
 	uint8_t *buf;
 	uint32_t len;
 
@@ -92,7 +122,7 @@ void q_bridge_dispatch(q_ring_t n, q_ring_data_t r) {
 		return;
 
 	// Print packet if debugging is enabled
-	if (q_bridge_debug)
+	if (b->debug)
 		q_ring_data_debug(r);
 
 	// Point the buffer to the correct location
@@ -234,4 +264,13 @@ uint16_t q_bridge_checksum_ip_proto(uint16_t *buf, uint16_t len, uint16_t proto,
 		sum = (sum & 0xFFFF) + (sum >> 16);
 
 	return ((uint16_t)(~sum));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Section:     Brdige destruction
+// Description: Close fd and free memory
+
+void q_bridge_free(q_bridge_t b)
+{
+	free(b);
 }
