@@ -42,6 +42,7 @@
 
 typedef struct q_bridge_t {
 	bool debug;
+	int epollfd;
 	size_t nrings;
 	q_ring_t ring[2];
 } *q_bridge_t;

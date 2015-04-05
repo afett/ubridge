@@ -37,6 +37,7 @@
 #include <errno.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <sys/epoll.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
@@ -72,6 +73,10 @@ q_bridge_t q_bridge_new(bool debug)
 	q_bridge_t n;
 	n = calloc(sizeof(*n), 1);
 	n->debug = debug;
+	n->epollfd = epoll_create1(0);
+	if (n->epollfd < 0) {
+		error("Failed to create epoll fd: %s", strerror(errno));
+	}
 	return n;
 }
 
@@ -317,5 +322,6 @@ void q_bridge_free(q_bridge_t b)
 	for (idx = 0; idx < b->nrings; ++idx) {
 		q_ring_free(b->ring[idx]);
 	}
+	close(b->epollfd);
 	free(b);
 }
