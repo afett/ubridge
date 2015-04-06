@@ -47,11 +47,17 @@ enum {
 ////////////////////////////////////////////////////////////////////////////////
 // Section:     Structs / Typedefs
 
+typedef struct q_port_t {
+	bool learning;
+	uint8_t lladdr[ETH_ALEN];
+	q_ring_t ring;
+} q_port_t;
+
 typedef struct q_bridge_t {
 	bool debug;
 	int epollfd;
-	size_t nrings;
-	q_ring_t ring[Q_BRIGE_MAXIF];
+	size_t nports;
+	q_port_t port[Q_BRIGE_MAXIF];
 } *q_bridge_t;
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -87,19 +87,20 @@ void q_bridge_add(q_bridge_t b, const char *ifname)
 	q_ring_t n;
 	struct epoll_event ev;
 
-	if (b->nrings == sizearr(b->ring)) {
-		error("Can't add interface, max size is %zu", sizearr(b->ring));
+	if (b->nports == sizearr(b->port)) {
+		error("Can't add interface, max size is %zu", sizearr(b->port));
 	}
 
 	// Create a ring for the new interface
 	n = q_ring_new(ifname);
 	ev.events = EPOLLIN;
-	ev.data.u64 = b->nrings;
+	ev.data.u64 = b->nports;
 	if (epoll_ctl(b->epollfd, EPOLL_CTL_ADD, n->rx->fd, &ev) != 0) {
 		error("Failed to add fd to epoll set: %s", strerror(errno));
 	}
-	b->ring[b->nrings] = n;
-	++b->nrings;
+	b->port[b->nports].ring = n;
+	b->port[b->nports].learning = true;
+	++b->nports;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -111,14 +112,14 @@ void q_bridge_start(q_bridge_t b) {
 	struct epoll_event ev[Q_BRIGE_MAXIF];
 	int nfd, i;
 
-	if (b->nrings < 2) {
-		error("Can't start, only have %zu interfaces", b->nrings);
+	if (b->nports < 2) {
+		error("Can't start, only have %zu interfaces", b->nports);
 		// no return
 	}
 
 	while (1) {
 		// Yield until data is available on either interface
-		nfd = epoll_wait(b->epollfd, ev, b->nrings, -1);
+		nfd = epoll_wait(b->epollfd, ev, b->nports, -1);
 		if (nfd <= 0) {
 			error("error in epoll_wait: %s", strerror(errno));
 		}
@@ -140,22 +141,22 @@ static void q_bridge_drain_ring(q_bridge_t b, size_t idx)
 
 	// Read from source interface and dispatch results (q_ring_data_t)
 	// to destination interface
-	while ((r = q_ring_read(b->ring[idx]))) {
-		for (didx = 0; didx < b->nrings; ++didx) {
+	while ((r = q_ring_read(b->port[idx].ring))) {
+		for (didx = 0; didx < b->nports; ++didx) {
 			if (didx == idx) {
 				continue;
 			}
-			q_bridge_dispatch(b, b->ring[didx], r);
+			q_bridge_dispatch(b, b->port[didx].ring, r);
 		}
 		q_ring_ready(r);
 	}
 
 	// Flushes dest ring if data was dispatched to it
-	for (didx = 0; didx < b->nrings; ++didx) {
+	for (didx = 0; didx < b->nports; ++didx) {
 		if (didx == idx) {
 			continue;
 		}
-		q_ring_flush(b->ring[didx], false);
+		q_ring_flush(b->port[idx].ring, false);
 	}
 }
 
@@ -327,8 +328,8 @@ static uint16_t q_bridge_checksum_ip_proto(uint16_t *buf, uint16_t len, uint16_t
 void q_bridge_free(q_bridge_t b)
 {
 	size_t idx;
-	for (idx = 0; idx < b->nrings; ++idx) {
-		q_ring_free(b->ring[idx]);
+	for (idx = 0; idx < b->nports; ++idx) {
+		q_ring_free(b->port[idx].ring);
 	}
 	close(b->epollfd);
 	free(b);
