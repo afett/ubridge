@@ -160,7 +160,7 @@ static void q_bridge_drain_ring(q_bridge_t b, size_t idx)
 		if (didx == idx) {
 			continue;
 		}
-		q_ring_flush(b->port[idx].ring, false);
+		q_ring_flush(b->port[didx].ring, false);
 	}
 }
 
