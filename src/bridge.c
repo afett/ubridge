@@ -95,7 +95,7 @@ void q_bridge_add(q_bridge_t b, const char *ifname)
 	n = q_ring_new(ifname);
 	ev.events = EPOLLIN;
 	ev.data.u64 = b->nrings;
-	if (epoll_ctl(b->epollfd, EPOLL_CTL_ADD, n->tx->fd, &ev) != 0) {
+	if (epoll_ctl(b->epollfd, EPOLL_CTL_ADD, n->rx->fd, &ev) != 0) {
 		error("Failed to add fd to epoll set: %s", strerror(errno));
 	}
 	b->ring[b->nrings] = n;
