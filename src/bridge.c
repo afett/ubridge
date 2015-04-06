@@ -57,7 +57,7 @@
 
 ////////////////////////////////////////////////////////////////////////////////
 // Section:     Prototypes for private methods
-static void q_bridge_dispatch(q_bridge_t b, q_ring_t n, q_ring_data_t r);
+static void q_bridge_dispatch(q_ring_t n, q_ring_data_t r);
 static void q_bridge_checksum(uint8_t *buf, uint32_t len);
 static uint16_t q_bridge_checksum_ip(uint16_t *buf, uint32_t len);
 static uint16_t q_bridge_checksum_ip_proto(uint16_t *buf, uint16_t len, uint16_t proto,
@@ -142,11 +142,15 @@ static void q_bridge_drain_ring(q_bridge_t b, size_t idx)
 	// Read from source interface and dispatch results (q_ring_data_t)
 	// to destination interface
 	while ((r = q_ring_read(b->port[idx].ring))) {
+		// Print packet if debugging is enabled
+		if (b->debug)
+			q_ring_data_debug(r);
+
 		for (didx = 0; didx < b->nports; ++didx) {
 			if (didx == idx) {
 				continue;
 			}
-			q_bridge_dispatch(b, b->port[didx].ring, r);
+			q_bridge_dispatch(b->port[didx].ring, r);
 		}
 		q_ring_ready(r);
 	}
@@ -164,7 +168,7 @@ static void q_bridge_drain_ring(q_bridge_t b, size_t idx)
 // Section:     Dispatch packet
 // Description: Writes packet to target ring
 
-static void q_bridge_dispatch(q_bridge_t b, q_ring_t n, q_ring_data_t r) {
+static void q_bridge_dispatch(q_ring_t n, q_ring_data_t r) {
 	uint8_t *buf;
 	uint32_t len;
 
@@ -175,10 +179,6 @@ static void q_bridge_dispatch(q_bridge_t b, q_ring_t n, q_ring_data_t r) {
 	    r->sll->sll_pkttype != PACKET_BROADCAST &&
 	    r->sll->sll_pkttype != PACKET_OTHERHOST)
 		return;
-
-	// Print packet if debugging is enabled
-	if (b->debug)
-		q_ring_data_debug(r);
 
 	// Point the buffer to the correct location
 	buf = r->blk + r->hdr->tp_mac;
